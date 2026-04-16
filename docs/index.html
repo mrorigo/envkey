@@ -347,6 +347,10 @@
 
 <span class="c"># run without polluting parent shell</span>
 <span class="k">ek run --profile dev -- node app.js</span>
+
+<span class="c"># clean up keys/profiles</span>
+<span class="k">ek key-rm --profile dev OPENAI_API_KEY -y</span>
+<span class="k">ek profile-rm --profile dev -y</span>
           </div>
         </aside>
       </section>
