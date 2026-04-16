@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>envkey | Secrets Without Ceremony</title>
+  <meta name="description" content="envkey is a secure, absurdly fast CLI for encrypted secret storage and instant environment injection." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0e1a;
+      --bg-2: #10172b;
+      --surface: rgba(15, 25, 50, 0.72);
+      --text: #e8f1ff;
+      --muted: #9db4d4;
+      --accent: #27f0b5;
+      --accent-2: #00c2ff;
+      --danger: #ff6b6b;
+      --ring: rgba(39, 240, 181, 0.45);
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: radial-gradient(1200px 500px at 10% -10%, #18305f 0%, transparent 60%),
+                  radial-gradient(900px 500px at 100% 0%, #053f4d 0%, transparent 55%),
+                  linear-gradient(160deg, var(--bg), var(--bg-2));
+      color: var(--text);
+      font-family: "Space Grotesk", system-ui, sans-serif;
+      min-height: 100%;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+      background-size: 46px 46px;
+      mask-image: radial-gradient(60% 50% at 50% 35%, black 20%, transparent 100%);
+      opacity: 0.4;
+    }
+
+    .wrap {
+      width: min(1120px, 92vw);
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 24px 0;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
+    }
+
+    .brand-badge {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      color: var(--accent);
+      border: 1px solid rgba(39, 240, 181, 0.4);
+      border-radius: 999px;
+      padding: 5px 10px;
+      background: rgba(39, 240, 181, 0.08);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 32px;
+      align-items: center;
+      padding: 32px 0 20px;
+    }
+
+    .eyebrow {
+      font-family: "IBM Plex Mono", monospace;
+      color: var(--accent);
+      font-size: 13px;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      opacity: 0;
+      transform: translateY(10px);
+      animation: rise 700ms ease-out forwards;
+    }
+
+    h1 {
+      font-size: clamp(2.2rem, 6vw, 4.8rem);
+      line-height: 1;
+      margin: 0;
+      max-width: 12ch;
+      opacity: 0;
+      transform: translateY(12px);
+      animation: rise 750ms 90ms ease-out forwards;
+    }
+
+    h1 .grad {
+      background: linear-gradient(100deg, var(--accent), var(--accent-2));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: clamp(1rem, 1.8vw, 1.2rem);
+      line-height: 1.55;
+      max-width: 54ch;
+      margin: 20px 0 30px;
+      opacity: 0;
+      transform: translateY(12px);
+      animation: rise 800ms 170ms ease-out forwards;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      opacity: 0;
+      transform: translateY(12px);
+      animation: rise 820ms 250ms ease-out forwards;
+    }
+
+    .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px 18px;
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #06202a;
+      box-shadow: 0 12px 30px rgba(0, 194, 255, 0.26);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .btn:hover { transform: translateY(-2px); }
+    .btn:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+
+    .terminal {
+      background: rgba(5, 11, 25, 0.84);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      opacity: 0;
+      transform: translateY(14px);
+      animation: rise 850ms 300ms ease-out forwards;
+    }
+
+    .terminal-head {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot.r { background: #ff6b6b; }
+    .dot.y { background: #ffd166; }
+    .dot.g { background: #4ade80; }
+
+    .code {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.92rem;
+      line-height: 1.6;
+      padding: 18px;
+      color: #ccf8eb;
+      white-space: pre-wrap;
+    }
+
+    .code .c { color: #8ba3c6; }
+    .code .k { color: #67f7cc; }
+    .code .v { color: #7fd8ff; }
+
+    .metrics {
+      margin: 54px 0 20px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .metric {
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 14px;
+      padding: 16px;
+      backdrop-filter: blur(8px);
+      transform: translateY(8px);
+      opacity: 0;
+      animation: rise 700ms ease-out forwards;
+    }
+
+    .metric:nth-child(1) { animation-delay: 420ms; }
+    .metric:nth-child(2) { animation-delay: 500ms; }
+    .metric:nth-child(3) { animation-delay: 580ms; }
+
+    .metric .n {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 1.1rem;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .metric .l { color: var(--muted); font-size: 0.95rem; }
+
+    .section {
+      margin: 40px 0 70px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 14px;
+      padding: 18px;
+      backdrop-filter: blur(8px);
+    }
+
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 1.05rem;
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 0.94rem;
+    }
+
+    .foot {
+      padding: 0 0 34px;
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: center;
+    }
+
+    @keyframes rise {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @media (max-width: 980px) {
+      .hero { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: 1fr; }
+      .section { grid-template-columns: 1fr; }
+      .sub { max-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="nav">
+      <div class="brand">
+        <span>envkey</span>
+        <span class="brand-badge">ek</span>
+      </div>
+      <div class="brand-badge">local-first secrets</div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <div class="eyebrow">No Dashboards. No Ceremony.</div>
+          <h1>Secrets management that feels <span class="grad">unfairly fast</span>.</h1>
+          <p class="sub">
+            `envkey` gives you encrypted profile-based secrets and instant injection into any command.
+            No shell pollution, no sprawling config ritual, no “platform migration” meeting.
+          </p>
+          <div class="actions">
+            <button class="btn btn-primary" id="copyInstall">Copy Install</button>
+            <button class="btn btn-secondary" id="copyEval">Copy eval Command</button>
+          </div>
+        </div>
+
+        <aside class="terminal" aria-label="Example terminal usage">
+          <div class="terminal-head">
+            <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+          </div>
+          <div class="code" id="demoCode">
+<span class="c"># add secrets</span>
+<span class="k">ek add --profile dev OPENAI_API_KEY</span> <span class="v">sk-...</span>
+<span class="k">ek add --profile dev ANTHROPIC_API_KEY</span> <span class="v">sk-ant-...</span>
+
+<span class="c"># load into shell</span>
+<span class="k">eval "$(ek env --profile dev)"</span>
+
+<span class="c"># run without polluting parent shell</span>
+<span class="k">ek run --profile dev -- node app.js</span>
+          </div>
+        </aside>
+      </section>
+
+      <section class="metrics">
+        <div class="metric">
+          <div class="n">~20 min</div>
+          <div class="l">Idea to working CLI</div>
+        </div>
+        <div class="metric">
+          <div class="n">AES-256-GCM</div>
+          <div class="l">Encrypted at rest</div>
+        </div>
+        <div class="metric">
+          <div class="n">Argon2id</div>
+          <div class="l">Password-based key derivation</div>
+        </div>
+      </section>
+
+      <section class="section">
+        <article class="card">
+          <h3>Fast Path</h3>
+          <p>Add a key, run a command, move on. Local dev secrets without detouring into enterprise complexity.</p>
+        </article>
+        <article class="card">
+          <h3>Real Security</h3>
+          <p>Vault data is encrypted. Decryption happens only when needed, and process injection keeps parent env clean.</p>
+        </article>
+        <article class="card">
+          <h3>Shell-Friendly</h3>
+          <p>`ek env --profile dev` prints correctly escaped export lines so `eval` works even with tricky values.</p>
+        </article>
+      </section>
+    </main>
+
+    <footer class="foot">envkey: because “we need a platform decision first” is not a security strategy.</footer>
+  </div>
+
+  <script>
+    const install = "cargo build --release";
+    const evalCmd = 'eval "$(ek env --profile dev)"';
+
+    async function copy(text, button, label) {
+      try {
+        await navigator.clipboard.writeText(text);
+        const old = button.textContent;
+        button.textContent = label;
+        setTimeout(() => button.textContent = old, 1200);
+      } catch {
+        alert(text);
+      }
+    }
+
+    document.getElementById("copyInstall").addEventListener("click", (e) => {
+      copy(install, e.currentTarget, "Copied");
+    });
+
+    document.getElementById("copyEval").addEventListener("click", (e) => {
+      copy(evalCmd, e.currentTarget, "Copied");
+    });
+  </script>
+</body>
+</html>
