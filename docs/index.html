@@ -62,6 +62,12 @@
       padding: 24px 0;
     }
 
+    .nav-right {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+    }
+
     .brand {
       display: inline-flex;
       align-items: center;
@@ -78,6 +84,24 @@
       border-radius: 999px;
       padding: 5px 10px;
       background: rgba(39, 240, 181, 0.08);
+    }
+
+    .gh-link {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.24);
+      border-radius: 999px;
+      padding: 5px 10px;
+      background: rgba(255,255,255,0.06);
+      text-decoration: none;
+      transition: transform .2s ease, background .2s ease, border-color .2s ease;
+    }
+
+    .gh-link:hover {
+      transform: translateY(-1px);
+      background: rgba(255,255,255,0.1);
+      border-color: rgba(255,255,255,0.35);
     }
 
     .hero {
@@ -288,7 +312,10 @@
         <span>envkey</span>
         <span class="brand-badge">ek</span>
       </div>
-      <div class="brand-badge">local-first secrets</div>
+      <div class="nav-right">
+        <div class="brand-badge">local-first secrets</div>
+        <a class="gh-link" href="https://github.com/mrorigo/envkey" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </div>
     </header>
 
     <main>
