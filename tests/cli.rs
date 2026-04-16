@@ -150,3 +150,143 @@ fn env_output_is_eval_safe_with_single_quotes() {
         .success()
         .stdout("sk'ant");
 }
+
+#[test]
+fn profiles_lists_available_profiles_sorted() {
+    let home = tempdir().expect("tempdir");
+
+    let mut add1 = Command::cargo_bin("envkey").expect("bin");
+    add1.env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["add", "--profile", "prod", "A", "1"])
+        .assert()
+        .success();
+
+    let mut add2 = Command::cargo_bin("envkey").expect("bin");
+    add2.env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["add", "--profile", "dev", "B", "2"])
+        .assert()
+        .success();
+
+    let mut profiles = Command::cargo_bin("envkey").expect("bin");
+    profiles
+        .env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["profiles"])
+        .assert()
+        .success()
+        .stdout("dev\nprod\n");
+}
+
+#[test]
+fn profiles_is_empty_for_new_vault() {
+    let home = tempdir().expect("tempdir");
+
+    let mut profiles = Command::cargo_bin("envkey").expect("bin");
+    profiles
+        .env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["profiles"])
+        .assert()
+        .success()
+        .stdout("");
+}
+
+#[test]
+fn profile_rm_deletes_profile_with_yes_flag() {
+    let home = tempdir().expect("tempdir");
+
+    let mut add_dev = Command::cargo_bin("envkey").expect("bin");
+    add_dev
+        .env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["add", "--profile", "dev", "A", "1"])
+        .assert()
+        .success();
+
+    let mut add_prod = Command::cargo_bin("envkey").expect("bin");
+    add_prod
+        .env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["add", "--profile", "prod", "B", "2"])
+        .assert()
+        .success();
+
+    let mut rm = Command::cargo_bin("envkey").expect("bin");
+    rm.env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["profile-rm", "--profile", "dev", "-y"])
+        .assert()
+        .success()
+        .stdout("Removed profile 'dev'\n");
+
+    let mut profiles = Command::cargo_bin("envkey").expect("bin");
+    profiles
+        .env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["profiles"])
+        .assert()
+        .success()
+        .stdout("prod\n");
+}
+
+#[test]
+fn key_rm_deletes_only_target_key_with_yes_flag() {
+    let home = tempdir().expect("tempdir");
+
+    let mut add_a = Command::cargo_bin("envkey").expect("bin");
+    add_a
+        .env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["add", "--profile", "dev", "OPENAI_API_KEY", "sk-123"])
+        .assert()
+        .success();
+
+    let mut add_b = Command::cargo_bin("envkey").expect("bin");
+    add_b
+        .env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["add", "--profile", "dev", "ANTHROPIC_API_KEY", "sk-ant-999"])
+        .assert()
+        .success();
+
+    let mut rm = Command::cargo_bin("envkey").expect("bin");
+    rm.env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["key-rm", "--profile", "dev", "OPENAI_API_KEY", "-y"])
+        .assert()
+        .success()
+        .stdout("Removed key 'OPENAI_API_KEY' from profile 'dev'\n");
+
+    let mut env_cmd = Command::cargo_bin("envkey").expect("bin");
+    env_cmd
+        .env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["env", "--profile", "dev"])
+        .assert()
+        .success()
+        .stdout("export ANTHROPIC_API_KEY='sk-ant-999'\n");
+}
+
+#[test]
+fn key_rm_returns_error_for_missing_key() {
+    let home = tempdir().expect("tempdir");
+
+    let mut add = Command::cargo_bin("envkey").expect("bin");
+    add.env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["add", "--profile", "dev", "A", "1"])
+        .assert()
+        .success();
+
+    let mut rm = Command::cargo_bin("envkey").expect("bin");
+    rm.env("HOME", home.path())
+        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .args(["key-rm", "--profile", "dev", "MISSING", "-y"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "Key not found in profile 'dev': MISSING",
+        ));
+}

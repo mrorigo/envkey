@@ -15,6 +15,7 @@ Enterprise security theater effort saved: incalculable.
 - Stores secrets by profile (`dev`, `prod`, etc).
 - Injects secrets into child processes without polluting parent shell env.
 - Prints shell exports when you want to `eval` into current shell.
+- Lets you list and remove profiles/keys when cleanup is needed.
 
 ## Install
 ```sh
@@ -51,11 +52,31 @@ export ANTHROPIC_API_KEY='sk-ant-...'
 export REPLICATE_API_TOKEN='r8_...'
 ```
 
+### List profiles
+```sh
+ek profiles
+```
+
+### Remove a profile
+```sh
+ek profile-rm --profile dev
+# non-interactive
+ek profile-rm --profile dev -y
+```
+
+### Remove a key from a profile
+```sh
+ek key-rm --profile dev OPENAI_API_KEY
+# non-interactive
+ek key-rm --profile dev OPENAI_API_KEY -y
+```
+
 ## Security model (the serious part)
 - Secrets are encrypted at rest.
 - Master password is required to decrypt vault data.
 - `run` injects vars into child process only.
 - `env` intentionally prints plaintext exports for shell consumption. Use it only when you accept that tradeoff.
+- Destructive commands (`profile-rm`, `key-rm`) require confirmation unless `-y` is provided.
 
 ## Dev
 ```sh

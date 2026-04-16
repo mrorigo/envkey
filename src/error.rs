@@ -9,8 +9,12 @@ pub enum AppError {
     Vault(#[from] vault::VaultError),
     #[error("Profile not found: {0}")]
     ProfileNotFound(String),
+    #[error("Key not found in profile '{profile}': {key}")]
+    KeyNotFound { profile: String, key: String },
     #[error("No command provided to run")]
     MissingCommand,
+    #[error("Operation cancelled")]
+    OperationCancelled,
 }
 
 pub type AppResult<T> = Result<T, AppError>;

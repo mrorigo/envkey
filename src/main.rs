@@ -33,5 +33,17 @@ fn run() -> error::AppResult<()> {
             commands::env::execute(&profile)?;
             Ok(())
         }
+        Commands::Profiles => {
+            commands::profiles::execute()?;
+            Ok(())
+        }
+        Commands::ProfileRm { profile, yes } => {
+            commands::profile_rm::execute(&profile, yes)?;
+            Ok(())
+        }
+        Commands::KeyRm { profile, key, yes } => {
+            commands::key_rm::execute(&profile, &key, yes)?;
+            Ok(())
+        }
     }
 }

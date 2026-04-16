@@ -29,4 +29,21 @@ pub enum Commands {
         #[arg(short, long)]
         profile: String,
     },
+    /// List available profile names
+    Profiles,
+    /// Remove a profile and all its keys
+    ProfileRm {
+        #[arg(short, long)]
+        profile: String,
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
+    /// Remove a single key from a profile
+    KeyRm {
+        #[arg(short, long)]
+        profile: String,
+        key: String,
+        #[arg(short = 'y', long)]
+        yes: bool,
+    },
 }
