@@ -4,9 +4,7 @@ use crate::error::AppResult;
 
 pub fn execute() -> AppResult<()> {
     let session = require_session()?;
-    let profiles = daemon::vault_profiles(session)?;
-    for profile in profiles {
-        println!("{profile}");
-    }
+    daemon::auth_lock(session)?;
+    println!("Session locked");
     Ok(())
 }

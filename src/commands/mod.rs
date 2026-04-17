@@ -1,6 +1,11 @@
 pub mod add;
+pub mod auth;
 pub mod env;
 pub mod key_rm;
+pub mod lock;
+pub mod logout;
 pub mod profile_rm;
 pub mod profiles;
 pub mod run;
+pub mod session;
+pub mod status;

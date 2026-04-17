@@ -10,6 +10,14 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
+    /// Authenticate and create an ephemeral session
+    Auth,
+    /// Show daemon and session status
+    Status,
+    /// Lock current session
+    Lock,
+    /// Logout current session
+    Logout,
     /// Add or update a secret in a profile
     Add {
         #[arg(short, long)]
@@ -46,4 +54,6 @@ pub enum Commands {
         #[arg(short = 'y', long)]
         yes: bool,
     },
+    #[command(hide = true, name = "__daemon_serve")]
+    DaemonServe,
 }

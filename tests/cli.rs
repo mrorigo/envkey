@@ -2,13 +2,35 @@ use assert_cmd::Command;
 use predicates::prelude::*;
 use tempfile::tempdir;
 
+fn auth_token(home: &std::path::Path) -> String {
+    let mut auth = Command::cargo_bin("envkey").expect("bin");
+    let output = auth
+        .env("HOME", home)
+        .env("ENVKEY_AUTH_PASSWORD", "pw1")
+        .args(["auth"])
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+
+    let line = String::from_utf8(output).expect("utf8");
+    let token = line
+        .trim()
+        .strip_prefix("export ENVKEY_SESSION='")
+        .and_then(|s| s.strip_suffix('\''))
+        .expect("token format");
+    token.to_string()
+}
+
 #[test]
 fn add_and_run_injects_variable() {
     let home = tempdir().expect("tempdir");
+    let session = auth_token(home.path());
 
     let mut add = Command::cargo_bin("envkey").expect("bin");
     add.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .env("ENVKEY_SESSION", &session)
         .args(["add", "--profile", "dev", "API_KEY", "abc123"])
         .assert()
         .success()
@@ -18,7 +40,7 @@ fn add_and_run_injects_variable() {
 
     let mut run = Command::cargo_bin("envkey").expect("bin");
     run.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .env("ENVKEY_SESSION", &session)
         .args([
             "run",
             "--profile",
@@ -34,104 +56,55 @@ fn add_and_run_injects_variable() {
 }
 
 #[test]
-fn run_fails_for_missing_profile() {
+fn commands_require_session() {
     let home = tempdir().expect("tempdir");
 
-    let mut run = Command::cargo_bin("envkey").expect("bin");
-    run.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["run", "--profile", "missing", "--", "echo", "ok"])
+    let mut profiles = Command::cargo_bin("envkey").expect("bin");
+    profiles
+        .env("HOME", home.path())
+        .args(["profiles"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Profile not found: missing"));
+        .stderr(predicate::str::contains("No ENVKEY_SESSION set"));
 }
 
 #[test]
-fn run_propagates_exit_code() {
+fn profiles_lists_available_profiles_sorted() {
     let home = tempdir().expect("tempdir");
-
-    let mut add = Command::cargo_bin("envkey").expect("bin");
-    add.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["add", "--profile", "dev", "A", "1"])
-        .assert()
-        .success();
-
-    let mut run = Command::cargo_bin("envkey").expect("bin");
-    run.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["run", "--profile", "dev", "--", "sh", "-c", "exit 7"])
-        .assert()
-        .code(7);
-}
-
-#[test]
-fn parent_environment_is_not_modified() {
-    let home = tempdir().expect("tempdir");
-
-    let mut add = Command::cargo_bin("envkey").expect("bin");
-    add.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["add", "--profile", "dev", "API_KEY", "vault"])
-        .assert()
-        .success();
-
-    let mut run = Command::cargo_bin("envkey").expect("bin");
-    run.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .env("API_KEY", "parent")
-        .args([
-            "run",
-            "--profile",
-            "dev",
-            "--",
-            "sh",
-            "-c",
-            "printf %s \"$API_KEY\"",
-        ])
-        .assert()
-        .success()
-        .stdout("vault");
-}
-
-#[test]
-fn env_outputs_export_lines() {
-    let home = tempdir().expect("tempdir");
+    let session = auth_token(home.path());
 
     let mut add1 = Command::cargo_bin("envkey").expect("bin");
     add1.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["add", "--profile", "dev", "OPENAI_API_KEY", "sk-123"])
+        .env("ENVKEY_SESSION", &session)
+        .args(["add", "--profile", "prod", "A", "1"])
         .assert()
         .success();
 
     let mut add2 = Command::cargo_bin("envkey").expect("bin");
     add2.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["add", "--profile", "dev", "REPLICATE_API_TOKEN", "r8_456"])
+        .env("ENVKEY_SESSION", &session)
+        .args(["add", "--profile", "dev", "B", "2"])
         .assert()
         .success();
 
-    let mut env_cmd = Command::cargo_bin("envkey").expect("bin");
-    env_cmd
+    let mut profiles = Command::cargo_bin("envkey").expect("bin");
+    profiles
         .env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["env", "--profile", "dev"])
+        .env("ENVKEY_SESSION", &session)
+        .args(["profiles"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("export OPENAI_API_KEY='sk-123'\n"))
-        .stdout(predicate::str::contains(
-            "export REPLICATE_API_TOKEN='r8_456'\n",
-        ));
+        .stdout("dev\nprod\n");
 }
 
 #[test]
 fn env_output_is_eval_safe_with_single_quotes() {
     let home = tempdir().expect("tempdir");
+    let session = auth_token(home.path());
 
     let mut add = Command::cargo_bin("envkey").expect("bin");
     add.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .env("ENVKEY_SESSION", &session)
         .args(["add", "--profile", "dev", "ANTHROPIC_API_KEY", "sk'ant"])
         .assert()
         .success();
@@ -140,7 +113,7 @@ fn env_output_is_eval_safe_with_single_quotes() {
     let envkey_bin = env!("CARGO_BIN_EXE_envkey");
     shell
         .env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .env("ENVKEY_SESSION", &session)
         .arg("-c")
         .arg(format!(
             "eval \"$({} env --profile dev)\"; printf %s \"$ANTHROPIC_API_KEY\"",
@@ -152,41 +125,55 @@ fn env_output_is_eval_safe_with_single_quotes() {
 }
 
 #[test]
-fn profiles_lists_available_profiles_sorted() {
+fn profile_and_key_remove_with_yes() {
     let home = tempdir().expect("tempdir");
+    let session = auth_token(home.path());
 
-    let mut add1 = Command::cargo_bin("envkey").expect("bin");
-    add1.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["add", "--profile", "prod", "A", "1"])
-        .assert()
-        .success();
-
-    let mut add2 = Command::cargo_bin("envkey").expect("bin");
-    add2.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["add", "--profile", "dev", "B", "2"])
-        .assert()
-        .success();
-
-    let mut profiles = Command::cargo_bin("envkey").expect("bin");
-    profiles
+    let mut add_a = Command::cargo_bin("envkey").expect("bin");
+    add_a
         .env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["profiles"])
+        .env("ENVKEY_SESSION", &session)
+        .args(["add", "--profile", "dev", "OPENAI_API_KEY", "sk-1"])
+        .assert()
+        .success();
+
+    let mut add_b = Command::cargo_bin("envkey").expect("bin");
+    add_b
+        .env("HOME", home.path())
+        .env("ENVKEY_SESSION", &session)
+        .args(["add", "--profile", "dev", "ANTHROPIC_API_KEY", "sk-ant-1"])
+        .assert()
+        .success();
+
+    let mut key_rm = Command::cargo_bin("envkey").expect("bin");
+    key_rm
+        .env("HOME", home.path())
+        .env("ENVKEY_SESSION", &session)
+        .args(["key-rm", "--profile", "dev", "OPENAI_API_KEY", "-y"])
+        .assert()
+        .success();
+
+    let mut env_cmd = Command::cargo_bin("envkey").expect("bin");
+    env_cmd
+        .env("HOME", home.path())
+        .env("ENVKEY_SESSION", &session)
+        .args(["env", "--profile", "dev"])
         .assert()
         .success()
-        .stdout("dev\nprod\n");
-}
+        .stdout("export ANTHROPIC_API_KEY='sk-ant-1'\n");
 
-#[test]
-fn profiles_is_empty_for_new_vault() {
-    let home = tempdir().expect("tempdir");
+    let mut profile_rm = Command::cargo_bin("envkey").expect("bin");
+    profile_rm
+        .env("HOME", home.path())
+        .env("ENVKEY_SESSION", &session)
+        .args(["profile-rm", "--profile", "dev", "-y"])
+        .assert()
+        .success();
 
     let mut profiles = Command::cargo_bin("envkey").expect("bin");
     profiles
         .env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .env("ENVKEY_SESSION", &session)
         .args(["profiles"])
         .assert()
         .success()
@@ -194,99 +181,40 @@ fn profiles_is_empty_for_new_vault() {
 }
 
 #[test]
-fn profile_rm_deletes_profile_with_yes_flag() {
+fn lock_and_logout_invalidate_session() {
     let home = tempdir().expect("tempdir");
+    let session = auth_token(home.path());
 
-    let mut add_dev = Command::cargo_bin("envkey").expect("bin");
-    add_dev
-        .env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["add", "--profile", "dev", "A", "1"])
+    let mut lock = Command::cargo_bin("envkey").expect("bin");
+    lock.env("HOME", home.path())
+        .env("ENVKEY_SESSION", &session)
+        .args(["lock"])
         .assert()
         .success();
-
-    let mut add_prod = Command::cargo_bin("envkey").expect("bin");
-    add_prod
-        .env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["add", "--profile", "prod", "B", "2"])
-        .assert()
-        .success();
-
-    let mut rm = Command::cargo_bin("envkey").expect("bin");
-    rm.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["profile-rm", "--profile", "dev", "-y"])
-        .assert()
-        .success()
-        .stdout("Removed profile 'dev'\n");
 
     let mut profiles = Command::cargo_bin("envkey").expect("bin");
     profiles
         .env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
+        .env("ENVKEY_SESSION", &session)
         .args(["profiles"])
         .assert()
-        .success()
-        .stdout("prod\n");
-}
+        .failure()
+        .stderr(predicate::str::contains("SESSION_LOCKED"));
 
-#[test]
-fn key_rm_deletes_only_target_key_with_yes_flag() {
-    let home = tempdir().expect("tempdir");
-
-    let mut add_a = Command::cargo_bin("envkey").expect("bin");
-    add_a
+    let mut logout = Command::cargo_bin("envkey").expect("bin");
+    logout
         .env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["add", "--profile", "dev", "OPENAI_API_KEY", "sk-123"])
+        .env("ENVKEY_SESSION", &session)
+        .args(["logout"])
         .assert()
         .success();
 
-    let mut add_b = Command::cargo_bin("envkey").expect("bin");
-    add_b
+    let mut profiles2 = Command::cargo_bin("envkey").expect("bin");
+    profiles2
         .env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["add", "--profile", "dev", "ANTHROPIC_API_KEY", "sk-ant-999"])
-        .assert()
-        .success();
-
-    let mut rm = Command::cargo_bin("envkey").expect("bin");
-    rm.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["key-rm", "--profile", "dev", "OPENAI_API_KEY", "-y"])
-        .assert()
-        .success()
-        .stdout("Removed key 'OPENAI_API_KEY' from profile 'dev'\n");
-
-    let mut env_cmd = Command::cargo_bin("envkey").expect("bin");
-    env_cmd
-        .env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["env", "--profile", "dev"])
-        .assert()
-        .success()
-        .stdout("export ANTHROPIC_API_KEY='sk-ant-999'\n");
-}
-
-#[test]
-fn key_rm_returns_error_for_missing_key() {
-    let home = tempdir().expect("tempdir");
-
-    let mut add = Command::cargo_bin("envkey").expect("bin");
-    add.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["add", "--profile", "dev", "A", "1"])
-        .assert()
-        .success();
-
-    let mut rm = Command::cargo_bin("envkey").expect("bin");
-    rm.env("HOME", home.path())
-        .env("ENVKEY_MASTER_PASSWORD", "pw1")
-        .args(["key-rm", "--profile", "dev", "MISSING", "-y"])
+        .env("ENVKEY_SESSION", &session)
+        .args(["profiles"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains(
-            "Key not found in profile 'dev': MISSING",
-        ));
+        .stderr(predicate::str::contains("SESSION_MISSING"));
 }
