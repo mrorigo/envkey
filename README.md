@@ -1,91 +1,134 @@
 # envkey
 
-A secure secrets-injection CLI that was apparently so hard to build it took:
-- one idea pasted into Gemini,
-- one PRD,
-- one pass through Codex,
-- and less time than a mediocre coffee break.
+`envkey` (`ek`) is a local-first secrets CLI for development workflows.
 
-Total effort: ~20 minutes.
+It encrypts secrets at rest and uses a local daemon-backed session model so you authenticate once and run multiple commands securely without putting your master password in shell environment variables.
 
-Enterprise security theater effort saved: incalculable.
+## Features
+- Encrypted vault at rest (`~/.envkey/vault.db`) using Argon2id + AES-256-GCM.
+- Profile-based secret organization (`dev`, `staging`, `prod`, etc).
+- Daemon-backed ephemeral sessions (`envkeyd`) with idle/max lifetime controls.
+- Secure command execution with injected environment variables (`ek run`).
+- Shell export output for intentional in-shell loading (`ek env`).
+- Profile/key lifecycle operations (list/add/remove).
 
-## What it does
-- Encrypts secrets at rest (`~/.envkey/vault.db`) using Argon2id + AES-256-GCM.
-- Stores secrets by profile (`dev`, `prod`, etc).
-- Injects secrets into child processes without polluting parent shell env.
-- Prints shell exports when you want to `eval` into current shell.
-- Lets you list and remove profiles/keys when cleanup is needed.
+## Architecture
+`envkey` has two runtime components:
+- `ek` CLI: user-facing command parser and daemon client.
+- `envkeyd` daemon: local Unix-socket server that holds unlocked key material in memory for active sessions.
 
-## Install
+Session model:
+1. `ek auth` prompts once for the master password.
+2. Daemon validates/decrypts vault and creates a session token.
+3. CLI prints an export line for `ENVKEY_SESSION`.
+4. Subsequent commands use `ENVKEY_SESSION` to authorize vault operations.
+
+## Installation
+### From source
 ```sh
 cargo build --release
-# binary: target/release/envkey
-# optional shorthand: ek (symlink envkey -> ek)
 ```
 
-## Usage
+Binary output:
+- `target/release/envkey`
 
-### Add/update a secret
+Optional shorthand:
+- create a symlink/alias `ek -> envkey`
+
+## Quick Start
+### 1. Authenticate once
 ```sh
-envkey add --profile dev OPENAI_API_KEY sk-...
-# or
+eval "$(ek auth)"
+```
+
+### 2. Add secrets
+```sh
 ek add --profile dev OPENAI_API_KEY sk-...
+ek add --profile dev ANTHROPIC_API_KEY sk-ant-...
 ```
 
-### Run a command with injected env vars
+### 3. Use secrets in a subprocess
 ```sh
-envkey run --profile dev -- node app.js
-# or
 ek run --profile dev -- node app.js
 ```
 
-### Export into current shell
+### 4. (Optional) export to current shell
 ```sh
 eval "$(ek env --profile dev)"
 ```
 
-Produces lines like:
-```sh
-export OPENAI_API_KEY='sk-...'
-export ANTHROPIC_API_KEY='sk-ant-...'
-export REPLICATE_API_TOKEN='r8_...'
-```
+## Command Reference
+### Session/Auth
+- `ek auth`
+  - Prompts for master password, starts daemon if needed, prints:
+  - `export ENVKEY_SESSION='...'`
+- `ek status`
+  - Shows daemon/session status.
+- `ek lock`
+  - Locks current session.
+- `ek logout`
+  - Revokes current session.
 
-### List profiles
-```sh
-ek profiles
-```
+### Vault Operations
+- `ek add --profile <name> <KEY> [VALUE]`
+  - Add/update secret. If `VALUE` is omitted, prompts securely.
+- `ek run --profile <name> -- <command ...>`
+  - Runs command with profile vars injected into child process env.
+- `ek env --profile <name>`
+  - Prints shell export lines (`export KEY='value'`) with safe quoting.
+- `ek profiles`
+  - Lists all profiles.
+- `ek key-rm --profile <name> <KEY> [-y]`
+  - Removes one key (`-y` skips confirmation).
+- `ek profile-rm --profile <name> [-y]`
+  - Removes profile and all keys (`-y` skips confirmation).
 
-### Remove a profile
-```sh
-ek profile-rm --profile dev
-# non-interactive
-ek profile-rm --profile dev -y
-```
-
-### Remove a key from a profile
-```sh
-ek key-rm --profile dev OPENAI_API_KEY
-# non-interactive
-ek key-rm --profile dev OPENAI_API_KEY -y
-```
-
-## Security model (the serious part)
+## Security Model
+### What envkey protects
 - Secrets are encrypted at rest.
-- Master password is required to decrypt vault data.
-- `run` injects vars into child process only.
-- `env` intentionally prints plaintext exports for shell consumption. Use it only when you accept that tradeoff.
-- Destructive commands (`profile-rm`, `key-rm`) require confirmation unless `-y` is provided.
+- Master password is not required for every command after session auth.
+- Operational commands require `ENVKEY_SESSION` instead of `ENVKEY_MASTER_PASSWORD`.
+- Sessions can be locked/logged out and expire automatically.
 
-## Dev
+### Important tradeoffs
+- `ek env` intentionally prints plaintext exports; use only when needed.
+- A valid `ENVKEY_SESSION` token is a capability for the session lifetime.
+- Local root/host compromise is out of scope.
+
+## Runtime Paths
+- Vault file: `~/.envkey/vault.db`
+- Runtime dir: `~/.envkey/run`
+- Daemon socket: `~/.envkey/run/envkeyd.sock`
+
+## Environment Variables
+- `ENVKEY_SESSION`
+  - Active session token used by operational commands.
+- `ENVKEY_AUTH_PASSWORD`
+  - Optional non-interactive input for `ek auth` (primarily for tests/automation).
+
+## Docker / Containers
+Recommended:
+- Run `ek` and `envkeyd` in the same container.
+
+Notes:
+- Session state resets when container restarts.
+- If splitting CLI/daemon across containers, share runtime socket path and maintain strict UID/permission controls.
+
+## Development
+### Test and lint
 ```sh
 cargo test
 cargo clippy -- -D warnings
 cargo fmt
 ```
 
-## Why this exists
-Because setting up “proper secret management” for local dev is usually treated like a six-month transformation program.
+### Daemon design doc
+See [docs/DAEMON_PLAN.md](docs/DAEMON_PLAN.md) for detailed design, protocol, and rollout rationale.
 
-It is not.
+## Roadmap
+- Windows support via IPC backend abstraction (named pipes).
+- Additional session policies (fresh-auth gates for sensitive operations).
+- Optional shell integration helpers for session lifecycle.
+
+## License
+MIT
