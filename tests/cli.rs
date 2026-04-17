@@ -56,16 +56,17 @@ fn add_and_run_injects_variable() {
 }
 
 #[test]
-fn commands_require_session() {
+fn commands_auto_auth_when_session_missing() {
     let home = tempdir().expect("tempdir");
 
     let mut profiles = Command::cargo_bin("envkey").expect("bin");
     profiles
         .env("HOME", home.path())
+        .env("ENVKEY_AUTH_PASSWORD", "pw1")
         .args(["profiles"])
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("No ENVKEY_SESSION set"));
+        .success()
+        .stdout("");
 }
 
 #[test]

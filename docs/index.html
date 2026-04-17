@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>envkey | Secrets Without Ceremony</title>
-  <meta name="description" content="envkey is a secure, absurdly fast CLI for encrypted secret storage and instant environment injection." />
+  <title>envkey | Session-Based Secrets CLI</title>
+  <meta name="description" content="envkey is a secure local-first secrets CLI with daemon-backed ephemeral sessions, encrypted storage, and profile-based injection." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -321,15 +321,15 @@
     <main>
       <section class="hero">
         <div>
-          <div class="eyebrow">No Dashboards. No Ceremony.</div>
-          <h1>Secrets management that feels <span class="grad">unfairly fast</span>.</h1>
+          <div class="eyebrow">Local-First Secrets CLI</div>
+          <h1><span class="grad">envkey</span> encrypts your API keys and injects them on demand.</h1>
           <p class="sub">
-            `envkey` gives you encrypted profile-based secrets and instant injection into any command.
-            No shell pollution, no sprawling config ritual, no “platform migration” meeting.
+            Manage secrets by profile, run tools with injected environment variables, and avoid putting your master password in shell env.
+            `ek auth` creates an ephemeral local session so you can operate securely across multiple commands.
           </p>
           <div class="actions">
-            <button class="btn btn-primary" id="copyInstall">Copy Install</button>
-            <button class="btn btn-secondary" id="copyEval">Copy eval Command</button>
+            <button class="btn btn-primary" id="copyAuth">Copy Auth Command</button>
+            <button class="btn btn-secondary" id="copyInstall">Copy Install</button>
           </div>
         </div>
 
@@ -338,11 +338,15 @@
             <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
           </div>
           <div class="code" id="demoCode">
+<span class="c"># start a session (once per shell)</span>
+<span class="k">eval "$(ek auth)"</span>
+<span class="k">ek status</span>
+
 <span class="c"># add secrets</span>
 <span class="k">ek add --profile dev OPENAI_API_KEY</span> <span class="v">sk-...</span>
 <span class="k">ek add --profile dev ANTHROPIC_API_KEY</span> <span class="v">sk-ant-...</span>
 
-<span class="c"># load into shell</span>
+<span class="c"># optional: export into current shell</span>
 <span class="k">eval "$(ek env --profile dev)"</span>
 
 <span class="c"># run without polluting parent shell</span>
@@ -351,47 +355,81 @@
 <span class="c"># clean up keys/profiles</span>
 <span class="k">ek key-rm --profile dev OPENAI_API_KEY -y</span>
 <span class="k">ek profile-rm --profile dev -y</span>
+
+<span class="c"># end session</span>
+<span class="k">ek lock</span>
+<span class="k">ek logout</span>
           </div>
         </aside>
       </section>
 
       <section class="metrics">
         <div class="metric">
-          <div class="n">~20 min</div>
-          <div class="l">Idea to working CLI</div>
+          <div class="n">Ephemeral</div>
+          <div class="l">Daemon-backed sessions</div>
         </div>
         <div class="metric">
           <div class="n">AES-256-GCM</div>
           <div class="l">Encrypted at rest</div>
         </div>
         <div class="metric">
-          <div class="n">Argon2id</div>
-          <div class="l">Password-based key derivation</div>
+          <div class="n">Profiles + Ops</div>
+          <div class="l">Add, run, list, remove</div>
         </div>
       </section>
 
       <section class="section">
         <article class="card">
-          <h3>Fast Path</h3>
-          <p>Add a key, run a command, move on. Local dev secrets without detouring into enterprise complexity.</p>
+          <h3>What envkey Is</h3>
+          <p>A command-line secret manager for local development. It stores credentials encrypted at rest and injects them only where needed.</p>
         </article>
         <article class="card">
-          <h3>Real Security</h3>
-          <p>Vault data is encrypted. Decryption happens only when needed, and process injection keeps parent env clean.</p>
+          <h3>How It Works</h3>
+          <p>You authenticate once (`ek auth`), receive an ephemeral session token, and run `add`, `run`, `env`, and management commands without repeated password prompts.</p>
         </article>
         <article class="card">
-          <h3>Shell-Friendly</h3>
-          <p>`ek env --profile dev` prints correctly escaped export lines so `eval` works even with tricky values.</p>
+          <h3>Where It Fits</h3>
+          <p>Use it for app dev, scripts, and agent workflows when `.env` sprawl and shell credential leakage become operational pain.</p>
+        </article>
+      </section>
+
+      <section class="section">
+        <article class="card">
+          <h3>Features</h3>
+          <p>Encrypted vault (`~/.envkey/vault.db`) with Argon2id + AES-256-GCM for at-rest protection.</p>
+        </article>
+        <article class="card">
+          <h3>Session Controls</h3>
+          <p>Ephemeral daemon-backed sessions with `auth`, `status`, `lock`, and `logout` commands.</p>
+        </article>
+        <article class="card">
+          <h3>Profile + Key Ops</h3>
+          <p>Profile-scoped add/list/remove workflows: `add`, `profiles`, `key-rm`, `profile-rm`.</p>
+        </article>
+      </section>
+
+      <section class="section">
+        <article class="card">
+          <h3>Session Auth</h3>
+          <p>`ek auth` unlocks once, then `ENVKEY_SESSION` authorizes subsequent commands until lock/logout/expiry.</p>
+        </article>
+        <article class="card">
+          <h3>Operational Control</h3>
+          <p>Built-in lifecycle operations for keys/profiles and explicit session controls (`status`, `lock`, `logout`).</p>
+        </article>
+        <article class="card">
+          <h3>Secure by Default</h3>
+          <p>No normal-path reliance on `ENVKEY_MASTER_PASSWORD`; vault operations require a valid session token.</p>
         </article>
       </section>
     </main>
 
-    <footer class="foot">envkey: because “we need a platform decision first” is not a security strategy.</footer>
+    <footer class="foot">envkey: modern local secrets management without credential sprawl.</footer>
   </div>
 
   <script>
     const install = "cargo build --release";
-    const evalCmd = 'eval "$(ek env --profile dev)"';
+    const authCmd = 'eval "$(ek auth)"';
 
     async function copy(text, button, label) {
       try {
@@ -404,12 +442,12 @@
       }
     }
 
-    document.getElementById("copyInstall").addEventListener("click", (e) => {
-      copy(install, e.currentTarget, "Copied");
+    document.getElementById("copyAuth").addEventListener("click", (e) => {
+      copy(authCmd, e.currentTarget, "Copied");
     });
 
-    document.getElementById("copyEval").addEventListener("click", (e) => {
-      copy(evalCmd, e.currentTarget, "Copied");
+    document.getElementById("copyInstall").addEventListener("click", (e) => {
+      copy(install, e.currentTarget, "Copied");
     });
   </script>
 </body>

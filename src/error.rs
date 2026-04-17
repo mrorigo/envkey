@@ -13,8 +13,6 @@ pub enum AppError {
     MissingCommand,
     #[error("Operation cancelled")]
     OperationCancelled,
-    #[error("No ENVKEY_SESSION set. Run: ek auth")]
-    SessionMissing,
     #[error("envkey daemon unavailable. Run: ek auth")]
     DaemonUnavailable,
     #[error("Daemon error [{code}]: {message}")]
